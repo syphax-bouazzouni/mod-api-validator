@@ -12,6 +12,12 @@ import {ModAPIResponseType} from "@/modapi-parser/modapi-parser";
 import React, {useEffect, useState} from "react";
 
 
+const FAIR_MANDATORY = [
+    '@id', '@type',
+    'dcterms:title','mod:acronym','owl:versionIRI', 'dcterms:identifier','mod:hasRepresentationLanguage', 'mod:hasSyntax','dcterms:type',
+    'dcterms:accessRights', 'dcterms:license','dcterms:rightsHolder', 'dcterms:description', 'dcat:landingPage', 'dcat:keyword', 'dcterms:created',
+    'dcterms:modified', 'dcat:contactPoint', 'dcterms:creator', 'dcterms:subject', 'dcat:accessURL'
+]
 const REQUIRED_PROPS = {
     artefact: [
         "@id", "@type",
@@ -92,7 +98,8 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
 
         if (filterKey) {
             outProps = Object.fromEntries(
-                Object.entries(properties).filter(([key]) => showOptional || REQUIRED_PROPS[filterKey].includes(key))
+                Object.entries(properties).filter(([key]) => showOptional || (REQUIRED_PROPS[filterKey].includes(key) && FAIR_MANDATORY.includes(key)))
+                    .sort((a,b) => a[1].title?.localeCompare(b[1].title || ''))
             );
         }
 
@@ -135,7 +142,7 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
                         checked={showOptional}
                         onChange={() => setShowOptional(!showOptional)}
                     />
-                    <label htmlFor={"showOptional"}>Show Optional endpoints</label>
+                    <label htmlFor={"showOptional"}>Show Optional Properties (by default are shown only FAIRsFAIR mandatory properties)</label>
                 </div>
                 <ScrollArea className="h-96 pr-4">
                     <ul className="divide-y divide-border">
