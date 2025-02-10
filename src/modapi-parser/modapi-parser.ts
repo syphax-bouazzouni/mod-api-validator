@@ -7,6 +7,7 @@ export interface ModAPIModel {
     description: string;
     key?: string;
     raw?: any;
+    list: boolean;
 }
 
 export interface ModAPIResponseType {
@@ -61,6 +62,7 @@ class ModAPIParser {
         const parsedEndpoints = [];
 
         Object.entries(spec.paths || {}).forEach(([path, methods]) => {
+            let parameters = methods.parameters?.map( x => x.$ref.split('/').pop()) || []
             Object.entries(methods).forEach(([method, details]) => {
                 if (method === 'parameters') return;
 
@@ -68,11 +70,12 @@ class ModAPIParser {
                     path,
                     method: method.toUpperCase(),
                     summary: details.summary || '',
-                    parameters: details.parameters || [],
+                    parameters: parameters,
                     responseType: this.#getResponseType(details.responses)
                 });
             });
         });
+
         this.modAPI.endpoints = parsedEndpoints;
     }
 
@@ -104,7 +107,7 @@ class ModAPIParser {
 
         if (ldResponse.items) {
             let schema = schemas[ldResponse.items.$ref.split('/').pop()]
-            return [response.title, this.#schemaToModelApi(code, schema, schemas)]
+            return [response.title, this.#schemaToModelApi(code, schema, schemas, true)]
         }
 
         ldResponse = ldResponse?.allOf || []
@@ -112,15 +115,17 @@ class ModAPIParser {
         let model = ldResponse.filter((item: any) => item.$ref && !excludedRefs.includes(item.$ref) || item.items)[0]
 
 
+        let list = false
         if (model) {
             if (model.type === 'array') {
                 model = model.items
+                list = true
             }
 
             let label = model.$ref.split('/').pop()
             model = schemas[label]
 
-            let newModel = this.#schemaToModelApi(code, model, schemas)
+            let newModel = this.#schemaToModelApi(code, model, schemas, list)
             return [label, newModel]
         } else {
             ldResponse.kew = code
@@ -139,13 +144,14 @@ class ModAPIParser {
         return this.allResponses[type];
     }
 
-    #schemaToModelApi(code: string, schema: any, schemas: any = {}): ModAPIModel {
+    #schemaToModelApi(code: string, schema: any, schemas: any = {}, list = false): ModAPIModel {
         return {
             properties: this.#schemaToProperties(schema, schemas),
             title: schema.title,
             description: schema.description,
             raw: schema,
-            key: code
+            key: code,
+            list: list,
         }
     }
 

@@ -61,9 +61,16 @@ const REQUIRED_PROPS = {
         "dcat:byteSize"
     ],
     catalog: [
-        "@id", "@type", 'dct:title', 'mod:color', 'mod:description', 'mod:logo', 'mod:fundedBy', 'mod:versionInfo', 'foaf:homepage', 'mod:numberOfArtefacts'
+        "@id", "@type", 'dcterms:title', 'mod:color', 'dcterms:description', 'mod:logo', 'mod:fundedBy', 'mod:versionInfo', 'foaf:homepage', 'mod:numberOfArtefacts'
     ]
 };
+
+function wrapInArray(string: string, list: false) {
+    if (list) {
+        return `Array(${string || ''})`
+    }
+    return string
+}
 
 export function ModelPopup({label, title, content}: { label: string, title: string, content: ModAPIResponseType }) {
     let properties = content.model.properties || {}
@@ -100,8 +107,8 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
     return (
         <Dialog>
             <DialogTrigger>
-                <div className={cn("flex", "items-center", "gap-1", "cursor-pointer")}>
-                    <span>{label} </span>
+                <div className={cn("flex", "align-middle", "items-center", "gap-1", "cursor-pointer")}>
+                    <span>{wrapInArray(label, content.model.list)} </span>
                     <span><MessageCircleWarning/></span>
                 </div>
             </DialogTrigger>

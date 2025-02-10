@@ -43,15 +43,7 @@ const EndpointExplorer = () => {
         })
 
         const formatEndpointParams = (parameters = []) => {
-            if (!parameters.length) return '';
             return parameters
-                .map(param => {
-                    if (param.in === 'path') return `<${param.name}>`;
-                    if (param.in === 'query') return `[${param.name}]`;
-                    return '';
-                })
-                .filter(param => param)
-                .join(' ');
         };
 
 
@@ -174,18 +166,25 @@ const EndpointExplorer = () => {
                                     </Badge>
                                     <code className="text-sm font-mono">
                                         {endpoint.path}
-                                        {endpoint.parameters.length > 0 && ' '}
-                                        {formatEndpointParams(endpoint.parameters)}
                                     </code>
                                 </div>
                                 <div className="text-sm text-gray-600 ml-1">
                                     <span> Returns: </span>
                                     <code className="text-purple-600">
-                                        <ModelPopup contitle={endpoint.responseType.title}
+                                        <ModelPopup title={endpoint.responseType.title}
                                                     label={endpoint.responseType.label}
                                                     content={endpoint.responseType}/>
                                     </code>
                                 </div>
+                                <div className="flex align-middle items-center gap-1 text-sm text-gray-600 ml-1">
+                                    <span> Params: </span>
+                                    {endpoint.parameters.map((param, index) => (
+                                        <code key={index} className={'border-spacing-1 border rounded p-0.5 bg-purple-50'} >
+                                            {param}
+                                        </code>
+                                    ))}
+                                </div>
+
                                 {endpoint.summary && (
                                     <div className="text-sm text-gray-500 mt-1 ml-1">
                                         {endpoint.summary}
