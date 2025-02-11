@@ -47,10 +47,14 @@ class ModAPIParser {
     async parse(url: string) {
         const response = await fetch(url);
         const yamlText = await response.text();
-        const spec = yaml.load(yamlText);
-        this.parseInfo(spec);
-        this.parseResponses(spec);
-        this.parseEndpoints(spec);
+        try {
+            const spec = yaml.load(yamlText);
+            this.parseInfo(spec);
+            this.parseResponses(spec);
+            this.parseEndpoints(spec);
+        } catch (e){
+            throw e
+        }
         return this.modAPI;
     }
 
@@ -88,7 +92,6 @@ class ModAPIParser {
         Object.entries(responses).forEach(([code, response]) => {
             console.log("parsing response", code)
             let [label, model] = this.#parseModels(code, response, spec.components.schemas)
-
 
             if (label) this.modAPI.models.push(model)
 

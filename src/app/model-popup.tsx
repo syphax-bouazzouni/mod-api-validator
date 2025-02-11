@@ -10,12 +10,13 @@ import {cn} from "@/lib/utils";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import {ModAPIResponseType} from "@/modapi-parser/modapi-parser";
 import React, {useEffect, useState} from "react";
+import {Input} from "@/components/ui/input";
 
 
 const FAIR_MANDATORY = [
     '@id', '@type',
-    'dcterms:title','mod:acronym','owl:versionIRI', 'dcterms:identifier','mod:hasRepresentationLanguage', 'mod:hasSyntax','dcterms:type',
-    'dcterms:accessRights', 'dcterms:license','dcterms:rightsHolder', 'dcterms:description', 'dcat:landingPage', 'dcat:keyword', 'dcterms:created',
+    'dcterms:title', 'mod:acronym', 'owl:versionIRI', 'dcterms:identifier', 'mod:hasRepresentationLanguage', 'mod:hasSyntax', 'dcterms:type',
+    'dcterms:accessRights', 'dcterms:license', 'dcterms:rightsHolder', 'dcterms:description', 'dcat:landingPage', 'dcat:keyword', 'dcterms:created',
     'dcterms:modified', 'dcat:contactPoint', 'dcterms:creator', 'dcterms:subject', 'dcat:accessURL'
 ]
 const REQUIRED_PROPS = {
@@ -83,33 +84,52 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
 
     const [showOptional, setShowOptional] = useState(false)
     const [showingCount, setShowingCount] = useState(0)
+    const [searchQuery, setSearchQuery] = useState('');
 
 
-    const filteredProps = (properties: any) => {
-        let outProps = properties
-        let filterKey = null
-        if (label == 'modSemanticArtefact') {
-            filterKey = 'artefact'
-        } else if (label == 'modSemanticArtefactCatalog') {
-            filterKey = 'catalog'
-        } else if (label == 'modSemanticArtefactDistribution') {
-            filterKey = 'distribution'
+    const filteredProps = (properties) => {
+        let outProps = properties;
+        let filterKey = null;
+
+        if (label === 'modSemanticArtefact') {
+            filterKey = 'artefact';
+        } else if (label === 'modSemanticArtefactCatalog') {
+            filterKey = 'catalog';
+        } else if (label === 'modSemanticArtefactDistribution') {
+            filterKey = 'distribution';
         }
 
         if (filterKey) {
             outProps = Object.fromEntries(
-                Object.entries(properties).filter(([key]) => showOptional || (REQUIRED_PROPS[filterKey].includes(key) && FAIR_MANDATORY.includes(key)))
-                    .sort((a,b) => a[1].title?.localeCompare(b[1].title || ''))
+                Object.entries(properties)
+                    .filter(([key]) =>
+                        showOptional ||
+                        (REQUIRED_PROPS[filterKey].includes(key) && FAIR_MANDATORY.includes(key))
+                    )
+                    .sort((a, b) => a[1].title?.localeCompare(b[1].title || ''))
             );
         }
 
-        return outProps
-    }
+        if (searchQuery) {
+            outProps = Object.fromEntries(
+                Object.entries(outProps).filter(([key, prop]) => {
+                    const searchTerm = searchQuery.toLowerCase();
+                    return (
+                        key.toLowerCase().includes(searchTerm) ||
+                        prop.title?.toLowerCase().includes(searchTerm) ||
+                        prop.description?.toLowerCase().includes(searchTerm)
+                    );
+                })
+            );
+        }
+
+        return outProps;
+    };
 
     useEffect(() => {
         let props = filteredProps(properties)
         setShowingCount(Object.keys(props).length)
-    }, [showOptional]);
+    }, [showOptional, searchQuery]);
 
     return (
         <Dialog>
@@ -142,22 +162,32 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
                         checked={showOptional}
                         onChange={() => setShowOptional(!showOptional)}
                     />
-                    <label htmlFor={"showOptional"}>Show Optional Properties (by default are shown only FAIRsFAIR mandatory properties)</label>
+                    <label htmlFor={"showOptional"}>Show Optional Properties (by default are shown only FAIRsFAIR
+                        mandatory properties)</label>
                 </div>
-                <ScrollArea className="h-96 pr-4">
-                    <ul className="divide-y divide-border">
-                        {Object.entries(filteredProps(properties)).map(([key, prop]) => (
-                            <li key={key} className="py-2">
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="font-medium">{prop.title}</span>
-                                    <span className="text-muted-foreground">({key})</span>
-                                    <span className="text-muted-foreground">—</span>
-                                    <span className="text-muted-foreground">{prop.description}</span>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </ScrollArea>
+                <div className="space-y-4">
+                    <Input
+                        type="search"
+                        placeholder="Search properties..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full"
+                    />
+                    <ScrollArea className="h-96 pr-4">
+                        <ul className="divide-y divide-border">
+                            {Object.entries(filteredProps(properties)).map(([key, prop]) => (
+                                <li key={key} className="py-2">
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="font-medium">{prop.title}</span>
+                                        <span className="text-muted-foreground">({key})</span>
+                                        <span className="text-muted-foreground">—</span>
+                                        <span className="text-muted-foreground">{prop.description}</span>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>)
 }

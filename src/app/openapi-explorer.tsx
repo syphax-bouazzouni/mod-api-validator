@@ -30,10 +30,11 @@ const FILTERS = {
 }
 
 const EndpointExplorer = () => {
-        const [yamlUrl, setYamlUrl] = useState(DEFAULT_URL);
+        const [yamlUrl, setYamlUrl] = useState('');
         const [endpoints, setEndpoints] = useState<Array<ModAPIEndpoint>>([]);
         const [loading, setLoading] = useState(false);
         const [error, setError] = useState(null);
+        const [searchQuery,setSearchQuery] = useState('')
         const [info, setInfo] = useState(null);
         const [filters, setFilters] = useState({
             records: false,
@@ -42,21 +43,37 @@ const EndpointExplorer = () => {
             data: true,
         })
 
-        const formatEndpointParams = (parameters = []) => {
-            return parameters
-        };
-
 
         useEffect(() => {
+            let savedYaml: string | null = localStorage.getItem('yamlUrl')
+
+            if (savedYaml === '' || savedYaml === null) {
+                setYamlUrl(DEFAULT_URL)
+                localStorage.setItem('yamlUrl', DEFAULT_URL);
+            } else {
+                setYamlUrl(savedYaml)
+            }
+            fetchAndParseYAML()
             setFilters(JSON.parse(localStorage.getItem('filters')) || filters)
-            localStorage.setItem('yamlUrl', yamlUrl);
         }, []);
 
+
+
         const fetchAndParseYAML = async () => {
+            let url = yamlUrl
+            if(url == '') {
+                url = localStorage.getItem('yamlUrl')
+            }
+
+            if (url == '') return
+
             setLoading(true);
             setError(null);
-            const modAPI: ModAPI = await modApiParser(yamlUrl);
             try {
+                console.log('Fetch yaml in :', url)
+                const modAPI: ModAPI = await modApiParser(url);
+
+                localStorage.setItem('yamlUrl', url)
                 setInfo(modAPI.info);
                 setEndpoints(modAPI.endpoints);
             } catch (err) {
@@ -66,19 +83,19 @@ const EndpointExplorer = () => {
             }
         };
         const filterEndpoints = (endpoints) => {
-            return endpoints.filter(endpoint =>
+            let filteredEndpoints = endpoints.filter(endpoint =>
                 Object.entries(filters).every(([filterKey, isEnabled]) =>
                     isEnabled || !FILTERS[filterKey].some(path => endpoint.path.includes(path))
                 )
             );
+
+            if (searchQuery) {
+                filteredEndpoints = filteredEndpoints.filter(endpoint => endpoint.path.includes(searchQuery.toLowerCase()))
+            }
+
+            return filteredEndpoints
         };
 
-        useEffect(() => {
-            if (localStorage.getItem('yamlUrl') !== null) {
-                setYamlUrl(localStorage.getItem('yamlUrl'));
-                fetchAndParseYAML();
-            }
-        }, []);
 
         useEffect(() => {
             localStorage.setItem('filters', JSON.stringify(filters))
@@ -152,6 +169,13 @@ const EndpointExplorer = () => {
                         </div>
                     )}
 
+                    <Input
+                        type="search"
+                        placeholder="Search paths..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full"
+                    />
                     <div className="gap-3 grid grid-cols-2">
                         {filterEndpoints(endpoints).map((endpoint, index) => (
                             <div
@@ -179,7 +203,7 @@ const EndpointExplorer = () => {
                                 <div className="flex align-middle items-center gap-1 text-sm text-gray-600 ml-1">
                                     <span> Params: </span>
                                     {endpoint.parameters.map((param, index) => (
-                                        <code key={index} className={'border-spacing-1 border rounded p-0.5 bg-purple-50'} >
+                                        <code key={index} className={'border-spacing-1 border rounded p-0.5 bg-purple-50'}>
                                             {param}
                                         </code>
                                     ))}
