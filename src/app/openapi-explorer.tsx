@@ -9,7 +9,7 @@ import {ModAPI, ModAPIEndpoint, modApiParser} from "@/modapi-parser/modapi-parse
 import {ModelPopup} from "@/app/model-popup";
 
 
-const DEFAULT_URL = 'https://raw.githubusercontent.com/FAIR-IMPACT/MOD-API/main/mod_api/static/mod_api/openAPI.yaml'
+const DEFAULT_URL = 'https://raw.githubusercontent.com/syphax-bouazzouni/MOD-API/main/mod_api/static/mod_api/openAPI.yaml'
 const methodColors = {
     GET: 'bg-blue-500',
     POST: 'bg-green-500',
