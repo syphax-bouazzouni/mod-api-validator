@@ -19,58 +19,11 @@ const FAIR_MANDATORY = [
     'dcterms:accessRights', 'dcterms:license', 'dcterms:rightsHolder', 'dcterms:description', 'dcat:landingPage', 'dcat:keyword', 'dcterms:created',
     'dcterms:modified', 'dcat:contactPoint', 'dcterms:creator', 'dcterms:subject', 'dcat:accessURL'
 ]
-const REQUIRED_PROPS = {
-    artefact: [
-        "@id", "@type",
-        "mod:acronym",
-        "dcterms:accessRights",
-        "dcterms:subject",
-        "mod:URI",
-        "owl:versionIRI",
-        "dcterms:creator",
-        "dcterms:identifier",
-        "mod:status",
-        "dcterms:language",
-        "dcterms:license",
-        "dcterms:rightsHolder",
-        "dcterms:description",
-        "dcat:landingPage",
-        "dcat:keyword",
-        "dcterms:bibliographicCitation",
-        "dcat:contactPoint",
-        "dcterms:contributor",
-        "dcterms:publisher",
-        "dcterms:coverage",
-        "pav:createdWith",
-        "dcterms:accrualMethod",
-        "dcterms:accrualPeriodicity",
-        "mod:competencyQuestion",
-        "prov:wasGeneratedBy",
-        "dcterms:hasFormat",
-        "schema:includedInDataCatalog",
-        "mod:semanticArtefactRelation"
-    ],
-    distribution: [
-        "@id", "@type",
-        "dcterms:title",
-        "mod:hasRepresentationLanguage",
-        "mod:hasSyntax",
-        "dcterms:description",
-        "dcterms:created",
-        "dcterms:modified",
-        "mod:conformsToKnowledgeRepresentationParadigm",
-        "mod:usedEngineeringMethodology",
-        "mod:prefLabelProperty",
-        "mod:synonymProperty",
-        "mod:definitionProperty",
-        "dcat:accessURL",
-        "dcat:downloadURL",
-        "dcat:byteSize"
-    ],
-    catalog: [
-        "@id", "@type", 'dcterms:title', 'mod:color', 'dcterms:description', 'mod:logo', 'mod:fundedBy', 'mod:versionInfo', 'foaf:homepage', 'mod:numberOfArtefacts'
-    ]
-};
+
+
+function RequiredAsterisk({required}: any) {
+    return required ? <span className="text-red-500">*</span> : null
+}
 
 function wrapInArray(string: string, list: false) {
     if (list) {
@@ -79,10 +32,17 @@ function wrapInArray(string: string, list: false) {
     return string
 }
 
+function isRequired(key: string, requiredProps: string[]) {
+    if (requiredProps && requiredProps.length > 0) {
+        return requiredProps.includes(key)
+    }
+    return false
+}
 export function ModelPopup({label, title, content}: { label: string, title: string, content: ModAPIResponseType }) {
-    let properties = content.model.properties || {}
+    const properties = content.model.properties || {}
 
     const [showOptional, setShowOptional] = useState(false)
+    const [showOnlyFAIR, setShowOnlyFAIR] = useState(true)
     const [showingCount, setShowingCount] = useState(0)
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -104,7 +64,7 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
                 Object.entries(properties)
                     .filter(([key]) =>
                         showOptional ||
-                        (REQUIRED_PROPS[filterKey].includes(key) && FAIR_MANDATORY.includes(key))
+                        ((isRequired(key, content.model.required)) && (FAIR_MANDATORY.includes(key) || !showOnlyFAIR))
                     )
                     .sort((a, b) => a[1].title?.localeCompare(b[1].title || ''))
             );
@@ -129,7 +89,7 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
     useEffect(() => {
         let props = filteredProps(properties)
         setShowingCount(Object.keys(props).length)
-    }, [showOptional, searchQuery]);
+    }, [showOptional, searchQuery, showOnlyFAIR]);
 
     return (
         <Dialog>
@@ -162,8 +122,16 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
                         checked={showOptional}
                         onChange={() => setShowOptional(!showOptional)}
                     />
-                    <label htmlFor={"showOptional"}>Show Optional Properties (by default are shown only FAIRsFAIR
-                        mandatory properties)</label>
+                    <label htmlFor={"showOptional"}>Show Optional Properties </label>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id={"showFAIR"}
+                        checked={showOnlyFAIR}
+                        onChange={() => setShowOnlyFAIR(!showOnlyFAIR)}
+                    />
+                    <label htmlFor={"showFAIR"}>Show Only FAIRsFAIR mandatory properties</label>
                 </div>
                 <div className="space-y-4">
                     <Input
@@ -178,7 +146,7 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
                             {Object.entries(filteredProps(properties)).map(([key, prop]) => (
                                 <li key={key} className="py-2">
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="font-medium">{prop.title}</span>
+                                        <span className="font-medium">{prop.title} <RequiredAsterisk key={key} required={isRequired(key, content.model.required)}/></span>
                                         <span className="text-muted-foreground">({key})</span>
                                         <span className="text-muted-foreground">—</span>
                                         <span className="text-muted-foreground">{prop.description}</span>

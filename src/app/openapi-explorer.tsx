@@ -70,7 +70,6 @@ const EndpointExplorer = () => {
             setLoading(true);
             setError(null);
             try {
-                console.log('Fetch yaml in :', url)
                 const modAPI: ModAPI = await modApiParser(url);
 
                 localStorage.setItem('yamlUrl', url)
@@ -90,7 +89,7 @@ const EndpointExplorer = () => {
             );
 
             if (searchQuery) {
-                filteredEndpoints = filteredEndpoints.filter(endpoint => endpoint.path.includes(searchQuery.toLowerCase()))
+                filteredEndpoints = filteredEndpoints.filter((endpoint) => endpoint.path.includes(searchQuery.toLowerCase()))
             }
 
             return filteredEndpoints
@@ -102,7 +101,7 @@ const EndpointExplorer = () => {
         }, [filters]);
 
         return (
-            <Card className="w-full">
+            <Card className="container mx-auto my-2">
                 <CardHeader>
                     <CardTitle>MOD API validator</CardTitle>
                 </CardHeader>

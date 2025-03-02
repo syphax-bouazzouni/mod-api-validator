@@ -1,9 +1,9 @@
 import yaml from "js-yaml";
-import {decodeGeneratedRanges} from "@jridgewell/sourcemap-codec";
 
 export interface ModAPIModel {
-    properties: Array<any>;
+    properties: {};
     title: string;
+    required: Array<string>;
     description: string;
     key?: string;
     raw?: any;
@@ -52,7 +52,7 @@ class ModAPIParser {
             this.parseInfo(spec);
             this.parseResponses(spec);
             this.parseEndpoints(spec);
-        } catch (e){
+        } catch (e) {
             throw e
         }
         return this.modAPI;
@@ -66,7 +66,7 @@ class ModAPIParser {
         const parsedEndpoints = [];
 
         Object.entries(spec.paths || {}).forEach(([path, methods]) => {
-            let parameters = methods.parameters?.map( x => x.$ref.split('/').pop()) || []
+            let parameters = methods.parameters?.map(x => x.$ref.split('/').pop()) || []
             Object.entries(methods).forEach(([method, details]) => {
                 if (method === 'parameters') return;
 
@@ -90,7 +90,6 @@ class ModAPIParser {
         if (!responses) return;
 
         Object.entries(responses).forEach(([code, response]) => {
-            console.log("parsing response", code)
             let [label, model] = this.#parseModels(code, response, spec.components.schemas)
 
             if (label) this.modAPI.models.push(model)
@@ -149,7 +148,8 @@ class ModAPIParser {
 
     #schemaToModelApi(code: string, schema: any, schemas: any = {}, list = false): ModAPIModel {
         return {
-            properties: this.#schemaToProperties(schema, schemas),
+            properties: this.schemaToProperties(schema, schemas),
+            required: this.schemaToRequired(schema, schemas),
             title: schema.title,
             description: schema.description,
             raw: schema,
@@ -158,52 +158,140 @@ class ModAPIParser {
         }
     }
 
-    #schemaToProperties(schema: any, schemas: any = {}): any {
-        let allProperties = this.#fetchProperties(schema)
-        console.log("All properties", allProperties, 'for', schema.title)
+    schemaToRequired(schema: any, schemas: Record<string, any> = {}): string[] {
+        return this.processSchema<string[]>(
+            schema,
+            schemas,
+            this.fetchRequired,
+            this.fetchRefsRequired,
+            (acc, items) => [...acc, ...items],
+            []
+        );
+    }
 
-        let refProperties = this.#fetchRefsProperties(schema, schemas);
-        console.log("Ref properties", refProperties, 'for', schema.title)
+    schemaToProperties(schema: any, schemas: Record<string, any> = {}): Record<string, any> {
+        const result = this.processSchema<Record<string, any>>(
+            schema,
+            schemas,
+            this.fetchProperties,
+            this.fetchRefsProperties,
+            (acc, items) => {
+                delete acc.$ref;
+                return {...acc, ...items};
+            },
+            {}
+        );
 
-        Object.entries(refProperties).map(([ref, value]: [string, any]) => {
-            if (value && Object.keys(value).length > 0) {
-                if (value.$ref) {
-                    let newRef = this.#schemaToProperties(schemas[value.$ref.split('/').pop()], schemas)
-                    if (newRef && Object.keys(newRef).length > 0){
-                        delete value['$ref']
-                        value = {...value, ...newRef}
+
+        return result;
+    }
+
+    private processSchema<T>(
+        schema: any,
+        schemas: Record<string, any>,
+        directExtractor: (s: any) => T,
+        refExtractor: (s: any, schemas: Record<string, any>) => Record<string, any>,
+        merger: (accumulated: T, newItems: T) => T,
+        initialValue: T
+    ): T {
+        let result = directExtractor.call(this, schema);
+        const refItems = refExtractor.call(this, schema, schemas);
+
+        for (const [ref, items] of Object.entries(refItems)) {
+            if (!items || (Array.isArray(items) && items.length === 0) ||
+                (!Array.isArray(items) && Object.keys(items).length === 0)) {
+                continue;
+            }
+
+            if ('$ref' in items) {
+                const refKey = this.getRefKey(items.$ref);
+                const nestedItems = this.processSchema<T>(
+                    schemas[refKey],
+                    schemas,
+                    directExtractor,
+                    refExtractor,
+                    merger,
+                    initialValue
+                );
+
+                if ((Array.isArray(nestedItems) && nestedItems.length > 0) ||
+                    (!Array.isArray(nestedItems) && Object.keys(nestedItems).length > 0)) {
+                    if (Array.isArray(items)) {
+                        const {$ref, ...restItems} = items as any;
+                        result = merger(result, merger(restItems as T, nestedItems));
+                    } else {
+                        result = merger(result, nestedItems);
                     }
                 }
-                delete allProperties[ref]
-                delete allProperties['$ref']
-                allProperties = {...allProperties, ...value}
+            } else {
+                result = merger(result, items);
             }
-        })
+        }
 
-        return allProperties
+        return result;
     }
 
-    #fetchRefsProperties(schema: any, schemas: any = {}) {
-        let refsProperties = {}
+    private fetchRefsProperties(schema: any, schemas: Record<string, any> = {}): Record<string, any> {
+        return this.fetchRefsItems(schema, schemas, this.fetchProperties);
+    }
+
+    private fetchRefsRequired(schema: any, schemas: Record<string, any> = {}): Record<string, any> {
+        return this.fetchRefsItems(schema, schemas, this.fetchRequired);
+    }
+
+    private fetchRefsItems<T>(
+        schema: any,
+        schemas: Record<string, any>,
+        extractor: (s: any) => T
+    ): Record<string, any> {
+        const refsItems: Record<string, any> = {};
+
         schema.allOf?.filter((item: any) => item.$ref || item.items).forEach((item: any) => {
-            let ref = item.$ref.split('/').pop()
-            let model = schemas[ref]
-            if (model) {
-                let newProperties = this.#fetchProperties(model)
-                if (newProperties) {
-                    refsProperties[ref] = newProperties
+            if (item.$ref) {
+                const refKey = this.getRefKey(item.$ref);
+                const model = schemas[refKey];
+
+                if (model) {
+                    const extractedItems = extractor.call(this, model);
+                    const isEmpty = Array.isArray(extractedItems)
+                        ? extractedItems.length === 0
+                        : Object.keys(extractedItems).length === 0;
+
+                    if (!isEmpty) {
+                        refsItems[refKey] = extractedItems;
+                    }
                 }
             }
-        })
-        return refsProperties
+        });
+
+        return refsItems;
     }
 
-    #fetchProperties(schema: any) {
+    private fetchProperties(schema: any): Record<string, any> {
         if (schema.properties) {
-            return schema.properties
-        } else {
-            let allProperties =  schema.allOf?.map((item: any) => item.properties || {$ref: item.$ref}).filter((item: any) => item != null) || []
-            return Object.assign({}, ...allProperties)
+            return schema.properties;
         }
+
+        const allProperties = schema.allOf?.map((item: any) =>
+            item.properties || (item.$ref ? {$ref: item.$ref} : null)
+        ).filter((item: any) => item !== null) || [];
+
+        return Object.assign({}, ...allProperties);
+    }
+
+    private fetchRequired(schema: any): string[] {
+        let required = schema.required || [];
+
+        schema.allOf?.forEach((item: any) => {
+            if (item.required) {
+                required = [...required, ...item.required];
+            }
+        });
+
+        return required;
+    }
+
+    private getRefKey(ref: string): string {
+        return ref.split('/').pop() || '';
     }
 }
