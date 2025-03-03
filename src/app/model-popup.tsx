@@ -45,6 +45,7 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
     const [showOnlyFAIR, setShowOnlyFAIR] = useState(true)
     const [showingCount, setShowingCount] = useState(0)
     const [searchQuery, setSearchQuery] = useState('');
+    const [requiredCount, setRequiredCount] = useState(0);
 
 
     const filteredProps = (properties) => {
@@ -89,13 +90,14 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
     useEffect(() => {
         let props = filteredProps(properties)
         setShowingCount(Object.keys(props).length)
+        setRequiredCount(Object.keys(props).filter((key) => isRequired(key, content.model.required)).length)
     }, [showOptional, searchQuery, showOnlyFAIR]);
 
     return (
         <Dialog>
             <DialogTrigger>
                 <div className={cn("flex", "align-middle", "items-center", "gap-1", "cursor-pointer")}>
-                    <span>{wrapInArray(label, content.model.list)} </span>
+                    <span>{wrapInArray(label, content.model.list)} (require {requiredCount} properties) </span>
                     <span><MessageCircleWarning/></span>
                 </div>
             </DialogTrigger>
