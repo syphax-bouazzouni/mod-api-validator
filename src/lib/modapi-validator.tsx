@@ -9,7 +9,7 @@ interface APITestResult<T> {
     endpoint: ModAPIEndpoint;
 }
 
-interface PropertiesResult {
+export interface PropertiesResult {
     allProperties: string[];
     allFoundProperties: string[];
     allRequiredProperties: string[];
@@ -21,17 +21,19 @@ interface PropertiesResult {
     foundRequiredProperties: number;
 }
 
-interface ParametersResult {
+export interface ParametersResult {
     totalParameters: number;
     implementedParameters: number;
 }
 
-interface EndpointValidationResult {
+export interface EndpointValidationResult {
     exists: boolean;
     properties: PropertiesResult;
     parameters: ParametersResult;
     originalResponse: any;
     expectedModel: ModAPIModel;
+    jsonLD: boolean;
+    pagination: boolean;
     testItem: any;
 }
 
@@ -116,6 +118,20 @@ class ValidationHelpers {
         };
     }
 
+    static checkEndpointPagination(response: any): boolean {
+        const keyToInclude = ['collection', 'page'];
+        return keyToInclude.every(key => response[key]);
+    }
+
+    static checkJSONLD(response: any, item: any, list: boolean): boolean {
+        if(list) {
+            return (response && response["@context"] ) &&
+                (item && item["@id"] && item["@type"]);
+        } else {
+            return (response && response["@context"] && response["@id"] && response["@type"])
+        }
+    }
+
     static validateEndpoint(
         endpoint: ModAPIEndpoint,
         response: APITestResult<any> | undefined
@@ -128,6 +144,8 @@ class ValidationHelpers {
             parameters: this.checkEndpointParameters(endpoint),
             originalResponse: response?.originalResponse,
             expectedModel: endpoint.responseType.model,
+            jsonLD: this.checkJSONLD(response?.originalResponse, itemToCheck, endpoint.responseType.model.list),
+            pagination: this.checkEndpointPagination(response?.originalResponse),
             testItem: itemToCheck
         };
     }
