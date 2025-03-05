@@ -17,9 +17,9 @@ import JSONViewer from "@/components/JSONViewer";
 
 const FAIR_MANDATORY = [
     '@id', '@type',
-    'dcterms:title', 'mod:acronym', 'owl:versionIRI', 'dcterms:identifier', 'mod:hasRepresentationLanguage', 'mod:hasSyntax', 'dcterms:type',
-    'dcterms:accessRights', 'dcterms:license', 'dcterms:rightsHolder', 'dcterms:description', 'dcat:landingPage', 'dcat:keyword', 'dcterms:created',
-    'dcterms:modified', 'dcat:contactPoint', 'dcterms:creator', 'dcterms:subject', 'dcat:accessURL'
+    'title', 'acronym', 'versionIRI', 'identifier', 'hasRepresentationLanguage', 'hasSyntax', 'type',
+    'accessRights', 'license', 'rightsHolder', 'description', 'landingPage', 'keyword', 'created',
+    'modified', 'contactPoint', 'creator', 'subject', 'accessURL'
 ]
 
 

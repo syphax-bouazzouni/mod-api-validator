@@ -63,7 +63,7 @@ export interface ModAPIEndpointFilter {
     setSearchQuery: any;
 }
 
-export const useModEndpointsFilter = (endpoints: ModAPIEndpoint[] | null | undefined, defaultFilters?:  EndpointFilters | null): ModAPIEndpointFilter => {
+export const useModEndpointsFilter = (endpoints: ModAPIEndpoint[] | null | undefined, defaultFilters?: EndpointFilters | null): ModAPIEndpointFilter => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filters, setFilters] = useState(defaultFilters || {
         records: false,
@@ -109,6 +109,11 @@ export const useModApiFetcher = () => {
         error
     } = useModAPI(fetchYamlUrl);
 
+    // Initialize yamlUrl from localStorage
+    useEffect(() => {
+        setYamlUrl(DEFAULT_URL);
+        setFetchYamlUrl(DEFAULT_URL);
+    }, []);
 
     const updateYamlUrl = (url: string) => {
         setFetchYamlUrl(url);
