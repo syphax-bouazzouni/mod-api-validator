@@ -100,7 +100,7 @@ export const refreshModAPI = (url: string, queryClient: any) => {
 
 export const useModApiFetcher = () => {
     const queryClient = useQueryClient();
-    const [yamlUrl, setYamlUrl] = useState('');
+    const [yamlUrl, setYamlUrl] = useState(DEFAULT_URL);
     const [fetchYamlUrl, setFetchYamlUrl] = useState('');
     const {
         data: modAPI,
@@ -109,20 +109,6 @@ export const useModApiFetcher = () => {
         error
     } = useModAPI(fetchYamlUrl);
 
-    // Initialize yamlUrl from localStorage
-    useEffect(() => {
-        let savedYaml: string | null = localStorage.getItem('yamlUrl');
-        if (savedYaml === '' || savedYaml === null) {
-            const defaultUrl = DEFAULT_URL;
-            setYamlUrl(defaultUrl);
-            setFetchYamlUrl(defaultUrl);
-            localStorage.setItem('yamlUrl', defaultUrl);
-        } else {
-            setYamlUrl(savedYaml);
-            setFetchYamlUrl(savedYaml);
-        }
-
-    }, []);
 
     const updateYamlUrl = (url: string) => {
         setFetchYamlUrl(url);
