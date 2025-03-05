@@ -42,7 +42,8 @@ export async function modApiParser(apiUrl: string) {
 class ModAPIParser {
 
     modAPI: ModAPI = {info: null, endpoints: [], models: []};
-    allResponses: { string: { title?: string; model: any; }; } | undefined;
+    allResponses: Record<string, { title?: string; label?: string | null, model: any; }> | undefined;
+
 
     async parse(url: string) {
         const response = await fetch(url);
@@ -63,11 +64,11 @@ class ModAPIParser {
     }
 
     parseEndpoints(spec: any) {
-        const parsedEndpoints = [];
+        const parsedEndpoints: any= [];
 
-        Object.entries(spec.paths || {}).forEach(([path, methods]) => {
-            let parameters = methods.parameters?.map(x => x.$ref.split('/').pop()) || []
-            Object.entries(methods).forEach(([method, details]) => {
+        Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
+            let parameters = methods.parameters?.map((x: any) => x.$ref.split('/').pop()) || []
+            Object.entries(methods).forEach(([method, details]: [string, any]) => {
                 if (method === 'parameters') return;
 
                 parsedEndpoints.push({
@@ -84,22 +85,22 @@ class ModAPIParser {
     }
 
     parseResponses(spec: any) {
-        this.allResponses = {};
+        this.allResponses = {} as any;
 
         let responses = spec.components.responses;
         if (!responses) return;
 
-        Object.entries(responses).forEach(([code, response]) => {
+        Object.entries(responses).forEach(([code, response]: [string, any]) => {
             let [label, model] = this.#parseModels(code, response, spec.components.schemas)
 
             if (label) this.modAPI.models.push(model)
 
-            this.allResponses[code] = {
-                title: response.content['application/ld+json']?.schema?.title,
-                label: label,
-                model: model
-            };
-
+            if(this.allResponses)
+                this.allResponses[code] = {
+                    title: response.content['application/ld+json']?.schema?.title,
+                    label: label,
+                    model: model
+                };
         });
     }
 
@@ -135,7 +136,7 @@ class ModAPIParser {
         }
     }
 
-    #getResponseType(responses) {
+    #getResponseType(responses: any) {
         if (!responses) return 'void';
 
         const successResponse = responses['200'] || responses['201'];
@@ -143,7 +144,7 @@ class ModAPIParser {
 
         const schema = successResponse;
         const type = schema.$ref.split('/').pop();
-        return this.allResponses[type];
+        return this.allResponses ? this.allResponses[type] : null;
     }
 
     #schemaToModelApi(code: string, schema: any, schemas: any = {}, list = false): ModAPIModel {
@@ -232,11 +233,11 @@ class ModAPIParser {
     }
 
     private fetchRefsProperties(schema: any, schemas: Record<string, any> = {}): Record<string, any> {
-        return this.fetchRefsItems(schema, schemas, this.fetchProperties);
+        return this.removePrefixedProperties(this.fetchRefsItems(schema, schemas, this.fetchProperties))
     }
 
     private fetchRefsRequired(schema: any, schemas: Record<string, any> = {}): Record<string, any> {
-        return this.fetchRefsItems(schema, schemas, this.fetchRequired);
+        return this.removePrefixedProperties(this.fetchRefsItems(schema, schemas, this.fetchRequired));
     }
 
     private fetchRefsItems<T>(
@@ -264,7 +265,23 @@ class ModAPIParser {
             }
         });
 
+
         return refsItems;
+    }
+
+    private removePrefixedProperties(properties: Record<string, any>): Record<string, any> {
+        const removedProperties = {}
+        Object.entries(properties).forEach(([key, value]: [string,any]) => {
+            removedProperties[this.removePrixProperty(key)] = value
+        })
+        return removedProperties
+    }
+
+    private removePrixProperty(key: string): string {
+        if(key === '@type' || key === '@context' || key == '@id') return key
+
+        const [prefix, rest] = key.split(':')
+        return rest
     }
 
     private fetchProperties(schema: any): Record<string, any> {
@@ -276,7 +293,7 @@ class ModAPIParser {
             item.properties || (item.$ref ? {$ref: item.$ref} : null)
         ).filter((item: any) => item !== null) || [];
 
-        return Object.assign({}, ...allProperties);
+        return this.removePrefixedProperties(Object.assign({}, ...allProperties));
     }
 
     private fetchRequired(schema: any): string[] {
@@ -288,7 +305,8 @@ class ModAPIParser {
             }
         });
 
-        return required;
+
+        return required.map((key: string) => this.removePrixProperty(key));
     }
 
     private getRefKey(ref: string): string {
