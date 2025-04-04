@@ -1,12 +1,14 @@
 import {useMemo} from 'react';
 import {QueryObserverResult, useQueries} from "@tanstack/react-query";
-import {ModAPIEndpoint, ModAPIModel} from "@/lib/modapi-parser";
+import {ModAPIEndpoint, ModAPIModel, ModAPIResponseType} from "@/lib/modapi-parser";
 
 interface APITestResult<T> {
     item: T | null;
     originalResponse: any;
+    status: number;
     path: string;
     endpoint: ModAPIEndpoint;
+    error: any;
 }
 
 export interface PropertiesResult {
@@ -32,6 +34,8 @@ export interface EndpointValidationResult {
     parameters: ParametersResult;
     originalResponse: any;
     expectedModel: ModAPIModel;
+    responseType: ModAPIResponseType;
+    goodType: boolean;
     jsonLD: boolean;
     pagination: boolean;
     testItem: any;
@@ -53,29 +57,44 @@ class APIUtils {
     }
 
     static processAPIResponse(data: any, path: string, endpoint: ModAPIEndpoint): APITestResult<any> {
-        const processedItem = this.extractFirstResult(data);
+        const processedItem = this.extractFirstResult(data.data);
         return {
             item: processedItem || null,
-            originalResponse: data,
+            status: data.status,
+            originalResponse: data.data,
+            error: data.error,
             path,
             endpoint
         };
     }
 
-    static async fetchURL(path: string, baseUrl: string, apiKey: string | null): Promise<any> {
-        const url = `${baseUrl}${path}`;
+    static async fetchURL(path: string, baseUrl: string, apiKey: string | null, params: string | null): Promise<any> {
+        let url = `${baseUrl}${path}`;
+        if (params) {
+            url += `?${params}`;
+        }
+
         const headers: Record<string, string> = apiKey
             ? {
                 "Authorization": `apikey token=${apiKey}`,
-                "Content-Type": "application/json, application/ld+json"
+                "Accept": "application/json, application/ld+json"
             }
-            : {};
+            : {
 
+                "Accept": "application/json, application/ld+json"
+            };
+
+        let status = 500;
         try {
-            const response = await fetch(url, {method: "GET", headers});
-            return await response.json();
-        } catch {
-            return {};
+            const response = await fetch(url, {method: "GET", headers, redirect: 'follow'});
+            status = response.status;
+            if (response.ok) {
+                return {status: status, data: await response.json(), url}
+            } else {
+                return {status: status, error: response.statusText, url, data: {}};
+            }
+        } catch (e) {
+            return {status: status, error: e, url, data: {}};
         }
     }
 }
@@ -120,16 +139,25 @@ class ValidationHelpers {
 
     static checkEndpointPagination(response: any): boolean {
         const keyToInclude = ['collection', 'page'];
-        return keyToInclude.every(key => response[key]);
+        return keyToInclude.every(key => response && response[key]);
     }
 
-    static checkJSONLD(response: any, item: any, list: boolean): boolean {
-        if(list) {
-            return (response && response["@context"] ) &&
-                (item && item["@id"] && item["@type"]);
-        } else {
-            return (response && response["@context"] && response["@id"] && response["@type"])
-        }
+    static checkJSONLD(response: any, item: any): boolean {
+
+        let output = response && response["@context"] && response["@id"] && response["@type"];
+        const parentContext = response && response["@context"];
+        output = output && (item === null ||
+            item["@id"] && item["@type"] && (item["@context"] || parentContext));
+        return output
+    }
+
+    static checkGoodType(itemToCheck: any,endpoint: ModAPIEndpoint): boolean {
+        return itemToCheck && itemToCheck["@type"] === endpoint.responseType.model.title
+    }
+
+    static checkStatus(response: APITestResult<any> | undefined): boolean {
+        return response !== null && response !== undefined
+            && (response.status === 200 || response.status === undefined)
     }
 
     static validateEndpoint(
@@ -137,37 +165,58 @@ class ValidationHelpers {
         response: APITestResult<any> | undefined
     ): EndpointValidationResult {
         const itemToCheck = response?.item;
-
         return {
-            exists: response !== undefined && Object.keys(itemToCheck || {}).length > 0,
+            exists: this.checkStatus(response),
             properties: this.checkEndpointProperties(endpoint, itemToCheck),
             parameters: this.checkEndpointParameters(endpoint),
             originalResponse: response?.originalResponse,
+            responseType: endpoint.responseType,
             expectedModel: endpoint.responseType.model,
-            jsonLD: this.checkJSONLD(response?.originalResponse, itemToCheck, endpoint.responseType.model.list),
+            jsonLD: this.checkJSONLD(response?.originalResponse, itemToCheck),
+            goodType: this.checkGoodType(itemToCheck, endpoint),
             pagination: this.checkEndpointPagination(response?.originalResponse),
             testItem: itemToCheck
         };
     }
 }
 
-export function useCollectionAPIValidator({endpoints, baseUrl, apiKey}: any): QueryObserverResult<APITestResult<any>>[] {
+export function useCollectionAPIValidator({
+                                              endpoints,
+                                              baseUrl,
+                                              apiKey,
+                                              params
+                                          }: any): QueryObserverResult<APITestResult<any>>[] {
     // Filter endpoints that don't require parent ID
     const collectionEndpoints = useMemo(() =>
-            (endpoints || []).filter((endpoint: any)=> !APIUtils.requireParentId(endpoint.path)),
+            (endpoints || []).filter((endpoint: any) => !APIUtils.requireParentId(endpoint.path)),
         [endpoints]
     );
 
     return useQueries({
-        queries: collectionEndpoints.map((endpoint: any) => ({
+        queries: collectionEndpoints.map((endpoint: ModAPIEndpoint) => ({
             queryKey: ['api-test-calls-collection', endpoint.path, baseUrl],
-            queryFn: () => APIUtils.fetchURL(endpoint.path, baseUrl, apiKey),
+            queryFn: () =>  {
+                if(endpoint.parameters.includes("query")){
+                    if(params === null){
+                        params = `?query=concept`
+                    } else {
+                        params += `&query=concept`
+                    }
+                }
+                return APIUtils.fetchURL(endpoint.path, baseUrl, apiKey, params)
+            },
             select: (data: any) => APIUtils.processAPIResponse(data, endpoint.path, endpoint)
         }))
     });
 }
 
-export function useSecondLevelAPIValidator({endpoints, collectionQueries, baseUrl, apiKey}: any): QueryObserverResult<APITestResult<any>>[] {
+export function useSecondLevelAPIValidator({
+                                               endpoints,
+                                               collectionQueries,
+                                               baseUrl,
+                                               apiKey,
+                                               params
+                                           }: any): QueryObserverResult<APITestResult<any>>[] {
     const secondLevelEndpoints = useMemo(() =>
             (endpoints || []).filter((endpoint: any) => APIUtils.requireParentId(endpoint.path)),
         [endpoints]
@@ -204,7 +253,7 @@ export function useSecondLevelAPIValidator({endpoints, collectionQueries, baseUr
 
             return {
                 queryKey: ['api-test-calls-second-level', resolvedPath, baseUrl],
-                queryFn: () => APIUtils.fetchURL(resolvedPath, baseUrl, apiKey),
+                queryFn: () => APIUtils.fetchURL(resolvedPath, baseUrl, apiKey, params),
                 select: (data: any) => APIUtils.processAPIResponse(data, resolvedPath, endpoint)
             };
         })
@@ -214,19 +263,26 @@ export function useSecondLevelAPIValidator({endpoints, collectionQueries, baseUr
 export function useModAPIValidator(
     endpoints: ModAPIEndpoint[] | null,
     baseUrl: string,
-    apiKey: string | null
+    apiKey: string | null,
+    params: string | null
 ) {
 
-    const collectionQueries = useCollectionAPIValidator({endpoints, baseUrl, apiKey});
-    const secondLevelQueries = useSecondLevelAPIValidator({endpoints, collectionQueries, baseUrl, apiKey});
+    const collectionQueries = useCollectionAPIValidator({endpoints, baseUrl, apiKey, params});
+    const secondLevelQueries = useSecondLevelAPIValidator({endpoints, collectionQueries, baseUrl, apiKey, params});
 
     // Combine and process results
     const results: Record<string, EndpointValidationResult> = {};
 
     if (endpoints && baseUrl) {
         if (!collectionQueries.some(query => query.isLoading)) {
-            collectionQueries.forEach((query, index) => {
-                const endpoint = endpoints[index];
+            collectionQueries.forEach((query) => {
+                const path = query.data?.path
+                const endpoint = endpoints.find((endpoint) => path && endpoint.path.startsWith(path));
+                if(!endpoint){
+                    console.log("Endpoint not found for path: ", path)
+                    return
+                }
+                // debugger
                 results[endpoint.path] = ValidationHelpers.validateEndpoint(endpoint, query.data);
             });
         }

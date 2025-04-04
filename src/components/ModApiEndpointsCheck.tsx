@@ -1,7 +1,6 @@
 import React from "react";
 
 export default function ModApiEndpointsChecks({filters, setFilters, enabledFilters}: any) {
-
     return (<div className={'flex gap-x-6'}>
             {filters && Object.entries(filters).map(([key, value]) => (
                 <div className="flex items-center gap-2">
@@ -16,15 +15,6 @@ export default function ModApiEndpointsChecks({filters, setFilters, enabledFilte
                     <label htmlFor={"show" + key}>Show {key} endpoints</label>
                 </div>
             ))}
-            <div className="flex items-center gap-2">
-                <input
-                    type="checkbox"
-                    id={"showMetadata"}
-                    checked={true}
-                    disabled={true}
-                />
-                <label htmlFor={"showMetadata"}>Show metadata endpoints</label>
-            </div>
         </div>
     );
 }
