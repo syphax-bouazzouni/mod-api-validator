@@ -65,13 +65,13 @@ export interface ModAPIEndpointFilter {
 
 export const useModEndpointsFilter = (endpoints: ModAPIEndpoint[] | null | undefined, defaultFilters?: EndpointFilters | null): ModAPIEndpointFilter => {
     const [searchQuery, setSearchQuery] = useState('');
+    let filteredEndpoints = endpoints || [];
     const [filters, setFilters] = useState(defaultFilters || {
         records: false,
         labels: false,
         search: false,
         data: false,
     });
-    let filteredEndpoints = endpoints || [];
 
     if (endpoints) {
         const newFilteredEndpoints = endpoints.filter((endpoint: any) =>

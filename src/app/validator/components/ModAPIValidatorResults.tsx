@@ -3,7 +3,7 @@ import {Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Table
 import {Button} from "@/components/ui/button";
 import ApiTestResultDetail from "@/app/validator/components/ApiTestResutDetail";
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
-import {CircleCheck, CircleX, Info} from "lucide-react";
+import {CircleCheck, CircleX, Info, Loader2} from "lucide-react";
 import {Alert} from "@/components/ui/alert";
 import ModApiEndpointsChecks from "@/components/ModApiEndpointsCheck";
 import Link from "next/link";
@@ -66,11 +66,14 @@ export function ShowPropertiesResult({endpoint}: { endpoint: EndpointValidationR
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger>
-                    <div className="flex items-center gap-2">
-                        <Checker check={allRequiredFound}/>
-                        <RequiredStatus properties={properties}/>
-                    </div>
+                    {properties.requiredProperties > 0 ?
+                        <div className="flex items-center gap-2">
+                            <Checker check={allRequiredFound}/>
+                            <RequiredStatus properties={properties}/>
+                        </div> :
+                        <span className="text-gray-500">N/A</span>}
                 </TooltipTrigger>
+
                 <TooltipContent className="bg-white border shadow-lg rounded-lg p-4 max-w-[300px]">
                     <div className="space-y-2">
                         <div className="flex justify-between items-center gap-2">
@@ -99,14 +102,40 @@ export function ShowPropertiesResult({endpoint}: { endpoint: EndpointValidationR
 }
 
 export function ShowJsonLDCheck({endpoint}: { endpoint: EndpointValidationResult }) {
-    return<span title={'Require @id, @type, @context'}> <Checker check={endpoint.jsonLD}/> </span>
+    return <span title={'Require @id, @type, @context'}> <Checker check={endpoint.jsonLD}/> </span>
 }
 
 export function ShowPaginationCheck({endpoint}: { endpoint: EndpointValidationResult }) {
-    return<span title={'Is paginated'}> <Checker check={endpoint.pagination}/> </span>
+    return <span title={'Is paginated'}> <Checker check={endpoint.pagination}/> </span>
 }
 
-export function ShowModAPIValidatorResults({baseUrl,results}: {
+export function ShowExpectedType({endpoint}: { endpoint: EndpointValidationResult }) {
+    let foundType = endpoint.testItem && endpoint.testItem['@type'] || [];
+    let expectedType = endpoint.responseType.label ? endpoint.responseType.label.replace("mod", "").trim() : "";
+
+    if (!(foundType instanceof Array)) {
+        foundType = [foundType];
+    }
+
+    foundType = foundType.map((type: string) => {
+        type = type.toString().split("/").pop();
+        type = type.replace("mod#", "").trim();
+        return type;
+    })
+
+
+    let goodType = expectedType !== "" && foundType.includes(expectedType);
+
+    return <span title={expectedType ? 'Expected type ' + expectedType + ' found type: ' + foundType : 'The specification did not provide a type'}>
+    {expectedType !== "" ?
+        <div className={'flex items-center gap-2'}>
+            <Checker check={goodType}/>
+        </div> :
+        <span className={'text-gray-500'}>N/A</span>}
+    </span>
+}
+
+export function ShowModAPIValidatorResults({baseUrl, results}: {
     baseUrl: string,
     results: Record<string, EndpointValidationResult>
 }) {
@@ -116,10 +145,10 @@ export function ShowModAPIValidatorResults({baseUrl,results}: {
             <TableRow>
                 <TableHead>Endpoint</TableHead>
                 <TableHead>Exists (Level 1)</TableHead>
-                <TableHead>Properties (Level 2-3-4)</TableHead>
-                <TableHead>JSON-LD ?</TableHead>
+                <TableHead>Good @type (Level 2)</TableHead>
+                <TableHead>Properties (Level 3-4)</TableHead>
+                <TableHead>Valid JSON-LD</TableHead>
                 <TableHead>Paginated</TableHead>
-                {/*<TableHead>Parameters</TableHead>*/}
                 <TableHead>See JSON</TableHead>
             </TableRow>
         </TableHeader>
@@ -127,20 +156,20 @@ export function ShowModAPIValidatorResults({baseUrl,results}: {
             {Object.entries(results).map(([path, endpoint], index) => (
                 <TableRow key={index}>
                     <TableCell className="font-medium">
-                        <Button variant={'link'}><Link href={baseUrl+path} target={'_blank'}>{path}</Link></Button>
+                        <Button variant={'link'}><Link href={baseUrl + path} target={'_blank'}>{path}</Link></Button>
                     </TableCell>
                     <TableCell>
-                        <div className={'flex items-center gap-2'}>
-                            <Checker check={endpoint.exists}/> <Level level={endpoint.exists ? 1 : 0}/>
+                        <div className={'flex items-center gap-2'}
+                             title={`Status: ${endpoint.originalResponse.status}`}>
+                            <Checker check={endpoint.exists}/>
                         </div>
+                    </TableCell>
+                    <TableCell>
+                        <ShowExpectedType endpoint={endpoint}/>
                     </TableCell>
                     <TableCell>
                         <ShowPropertiesResult endpoint={endpoint}/>
                     </TableCell>
-                    {/*<TableCell>*/}
-                    {/*    <div>Total: {endpoint.parameters.totalParameters}</div>*/}
-                    {/*    <div>Implemented: {endpoint.parameters.implementedParameters}</div>*/}
-                    {/*</TableCell>*/}
                     <TableCell>
                         <ShowJsonLDCheck endpoint={endpoint}/>
                     </TableCell>
@@ -156,12 +185,22 @@ export function ShowModAPIValidatorResults({baseUrl,results}: {
     </Table>
 }
 
+export function Loading() {
+    return (<div className="flex justify-center w-full py-4 items-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500"/>
+        <p>
+            Loading data...
+        </p>
+    </div>)
+}
+
 export function ModAPIValidatorResults({
-                                           model, baseUrl, apikey
+                                           model, baseUrl, apikey, params
                                        }: {
     model: ModAPI | undefined | null,
     baseUrl: string,
     apikey: string | null
+    params: string | null
 }) {
 
     if (!baseUrl || !model || !model.endpoints) {
@@ -169,19 +208,21 @@ export function ModAPIValidatorResults({
     }
 
     const enabledFilters = {
-        records: false,
-        search: false,
-        labels: false,
+        metadata: false,
+        search: true,
         data: true,
-        metadata: false
+        labels: false,
+        records: false
     }
 
-    const {filters, setFilters, filteredEndpoints} = useModEndpointsFilter(model.endpoints)
+    const checkedFilters = {...enabledFilters, metadata: true}
 
-    const {isError, results, errors, isLoading} = useModAPIValidator(filteredEndpoints, baseUrl, apikey);
+    const {filters, setFilters, filteredEndpoints} = useModEndpointsFilter(model.endpoints, checkedFilters);
+
+    const {isError, results, errors, isLoading} = useModAPIValidator(filteredEndpoints, baseUrl, apikey, params);
 
     return <div className="space-y-4">
-        {isLoading && <div>Loading...</div>}
+        {isLoading && <div><Loading/></div>}
         {isError && <Alert variant={'destructive'}>Error: {errors.map(x => x.message)}</Alert>}
         {results && Object.keys(results).length > 0 && <div>
             <ModApiEndpointsChecks filters={filters} setFilters={setFilters} enabledFilters={enabledFilters}/>
