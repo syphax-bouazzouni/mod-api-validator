@@ -53,6 +53,7 @@ class APIUtils {
     static extractFirstResult(data: any): any {
         if (data['@graph']) return data['@graph'][0];
         if (data['collection']) return data['collection'][0];
+        if (data['member']) return data['member'][0];
         return Array.isArray(data) ? data[0] : data;
     }
 
@@ -138,8 +139,9 @@ class ValidationHelpers {
     }
 
     static checkEndpointPagination(response: any): boolean {
-        const keyToInclude = ['collection', 'page'];
-        return keyToInclude.every(key => response && response[key]);
+        const keyToInclude = ['member', "@type", "totalItems", "view"];
+        return keyToInclude.every(key => response?.[key]);
+
     }
 
     static checkJSONLD(response: any, item: any): boolean {
@@ -151,8 +153,24 @@ class ValidationHelpers {
         return output
     }
 
-    static checkGoodType(itemToCheck: any,endpoint: ModAPIEndpoint): boolean {
-        return itemToCheck && itemToCheck["@type"] === endpoint.responseType.model.title
+    static checkGoodType(itemToCheck: any, endpoint: ModAPIEndpoint): boolean {
+        let foundType = itemToCheck && itemToCheck['@type'] || [];
+        let expectedType = endpoint.responseType.label ? endpoint.responseType.label.replace("mod", "").trim() : "";
+
+        if (!(foundType instanceof Array)) {
+            foundType = [foundType];
+        }
+
+        foundType = foundType.map((type: string) => {
+            type = type.toString().split("/").pop();
+            type = type.replace("mod#", "").trim();
+            type = type.replace("mod:", "").trim();
+            return type;
+        })
+
+
+        console.log("foundType", foundType)
+        return expectedType !== "" && foundType.includes(expectedType);
     }
 
     static checkStatus(response: APITestResult<any> | undefined): boolean {
@@ -195,12 +213,12 @@ export function useCollectionAPIValidator({
     return useQueries({
         queries: collectionEndpoints.map((endpoint: ModAPIEndpoint) => ({
             queryKey: ['api-test-calls-collection', endpoint.path, baseUrl],
-            queryFn: () =>  {
-                if(endpoint.parameters.includes("query")){
-                    if(params === null){
-                        params = `?query=concept`
+            queryFn: () => {
+                if (endpoint.parameters.includes("query")) {
+                    if (params === null) {
+                        params = `?q=concept&query=concept`
                     } else {
-                        params += `&query=concept`
+                        params += `&q=concept&query=concept`
                     }
                 }
                 return APIUtils.fetchURL(endpoint.path, baseUrl, apiKey, params)
@@ -278,7 +296,7 @@ export function useModAPIValidator(
             collectionQueries.forEach((query) => {
                 const path = query.data?.path
                 const endpoint = endpoints.find((endpoint) => path && endpoint.path.startsWith(path));
-                if(!endpoint){
+                if (!endpoint) {
                     console.log("Endpoint not found for path: ", path)
                     return
                 }
