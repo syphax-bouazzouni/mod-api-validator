@@ -1,7 +1,7 @@
 import yaml from "js-yaml";
 
 export interface ModAPIModel {
-    properties: {};
+    properties: any;
     title: string;
     required: Array<string>;
     description: string;
@@ -12,7 +12,7 @@ export interface ModAPIModel {
 
 export interface ModAPIResponseType {
     title: string;
-    label: string;
+    type: string;
     model: ModAPIModel;
 }
 
@@ -42,7 +42,7 @@ export async function modApiParser(apiUrl: string) {
 class ModAPIParser {
 
     modAPI: ModAPI = {info: null, endpoints: [], models: []};
-    allResponses: Record<string, { title?: string; label?: string | null, model: any; }> | undefined;
+    allResponses: Record<string, ModAPIResponseType> | undefined;
 
 
     async parse(url: string) {
@@ -64,7 +64,7 @@ class ModAPIParser {
     }
 
     parseEndpoints(spec: any) {
-        const parsedEndpoints: any= [];
+        const parsedEndpoints: any = [];
 
         Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
             let parameters = methods.parameters?.map((x: any) => x.$ref.split('/').pop()) || []
@@ -95,27 +95,44 @@ class ModAPIParser {
 
             if (label) this.modAPI.models.push(model)
 
-            if(this.allResponses)
+            if (this.allResponses)
                 this.allResponses[code] = {
                     title: response.content['application/ld+json']?.schema?.title,
-                    label: label,
-                    model: model
+                    type: label ?? '',
+                    model: model,
                 };
         });
+    }
+
+    #parseType(model: ModAPIModel): string {
+        let type = model?.properties?.["@type"].items?.example
+        return type
     }
 
     #parseModels(code: any, response: any, schemas: any = {}): [string | null, ModAPIModel] {
         let ldResponse = response.content['application/ld+json']?.schema || {}
         let excludedRefs = ["#/components/schemas/Pagination", '#/components/schemas/Context']
 
+
         if (ldResponse.items) {
             let schema = schemas[ldResponse.items.$ref.split('/').pop()]
-            return [response.title, this.#schemaToModelApi(code, schema, schemas, true)]
+            return [schema.title, this.#schemaToModelApi(code, schema, schemas, true)]
+        }
+        if (ldResponse?.properties?.member?.items) {
+            let schemaUrl = ldResponse.properties.member.items.$ref
+            let schemaId = schemaUrl.split('/').pop()
+            let schema = schemas[schemaId]
+            let model = this.#schemaToModelApi(code, schema, schemas, true)
+            let type = this.#parseType(model)
+            return [type || schemaId, model]
         }
 
         ldResponse = ldResponse?.allOf || []
-
-        let model = ldResponse.filter((item: any) => item.$ref && !excludedRefs.includes(item.$ref) || item.items)[0]
+        let model = null
+        try {
+            model = ldResponse.filter((item: any) => item.$ref && !excludedRefs.includes(item.$ref) || item.items)[0]
+        } catch (e) {
+        }
 
 
         let list = false
@@ -129,9 +146,10 @@ class ModAPIParser {
             model = schemas[label]
 
             let newModel = this.#schemaToModelApi(code, model, schemas, list)
-            return [label, newModel]
+            let type = this.#parseType(newModel)
+            return [type, newModel]
         } else {
-            ldResponse.kew = code
+            ldResponse.key = code
             return [null, ldResponse]
         }
     }
@@ -271,14 +289,14 @@ class ModAPIParser {
 
     private removePrefixedProperties(properties: Record<string, any>): Record<string, any> {
         const removedProperties = {}
-        Object.entries(properties).forEach(([key, value]: [string,any]) => {
+        Object.entries(properties).forEach(([key, value]: [string, any]) => {
             removedProperties[this.removePrixProperty(key)] = value
         })
         return removedProperties
     }
 
     private removePrixProperty(key: string): string {
-        if(key === '@type' || key === '@context' || key == '@id') return key
+        if (key === '@type' || key === '@context' || key == '@id') return key
 
         const [prefix, rest] = key.split(':')
         return rest
