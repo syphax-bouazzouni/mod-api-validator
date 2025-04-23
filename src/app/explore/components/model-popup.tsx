@@ -9,7 +9,7 @@ import {MessageCircleWarning} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import {ModAPIResponseType} from "@/lib/modapi-parser";
-import React, {useEffect, useState} from "react";
+import React, {useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import JSONViewer from "@/components/JSONViewer";
@@ -116,7 +116,7 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
     const [showOnlyFAIR, setShowOnlyFAIR] = useState(true)
     const [searchQuery, setSearchQuery] = useState('');
 
-    if (!content.model.properties) {
+    if (!content.model?.properties) {
         return
     }
 
@@ -176,9 +176,9 @@ export function ModelPopup({label, title, content}: { label: string, title: stri
                     />
                 </div>
 
-                <Tabs defaultValue="account" className="w-full h-[70vh]">
+                <Tabs defaultValue="table" className="w-full h-[70vh]">
                     <TabsList>
-                        <TabsTrigger value="table">Table view</TabsTrigger>
+                        <TabsTrigger value="table" >Table view</TabsTrigger>
                         <TabsTrigger value="json">Json view</TabsTrigger>
                     </TabsList>
                     <TabsContent value="table">
