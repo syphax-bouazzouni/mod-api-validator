@@ -10,9 +10,12 @@ import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {ModAPIDescription} from "@/components/ModAPIDescription";
 import ModApiEndpointsChecks from "@/components/ModApiEndpointsCheck";
 import {ModelPopup} from "@/app/explore/components/model-popup";
+import {EndpointFilters} from "@/lib/interfaces";
+import {AppConfig} from "@/lib/config";
+import {PageTitle} from "@/components/page-title";
 
 
-export const DEFAULT_URL = 'https://raw.githubusercontent.com/syphax-bouazzouni/MOD-API/main/mod_api/static/mod_api/openAPI.yaml'
+export const DEFAULT_URL = AppConfig.openapiUrl
 const methodColors = {
     GET: 'bg-blue-500',
     POST: 'bg-green-500',
@@ -25,14 +28,6 @@ const RECORDS_ENDPOINTS = ['record']
 const LABELS_ENDPOINTS = ['label']
 const SEARCH_ENDPOINTS = ['search']
 const DATA_ENDPOINTS = ['class', 'concept', 'resource', 'schemes', 'collection', 'property']
-
-interface EndpointFilters {
-    records: boolean
-    labels: boolean
-    search: boolean
-    data: boolean
-}
-
 export const FILTERS = {
     records: RECORDS_ENDPOINTS,
     labels: LABELS_ENDPOINTS,
@@ -54,15 +49,6 @@ export const useModAPI = (url: string) => {
     });
 }
 
-
-export interface ModAPIEndpointFilter {
-    filteredEndpoints: ModAPIEndpoint[];
-    filters: Record<string, boolean>;
-    setFilters: any;
-    searchQuery: string;
-    setSearchQuery: any;
-}
-
 export const useModEndpointsFilter = (endpoints: ModAPIEndpoint[] | null | undefined, defaultFilters?: EndpointFilters | null): ModAPIEndpointFilter => {
     const [searchQuery, setSearchQuery] = useState('');
     let filteredEndpoints = endpoints || [];
@@ -74,12 +60,11 @@ export const useModEndpointsFilter = (endpoints: ModAPIEndpoint[] | null | undef
     });
 
     if (endpoints) {
-        const newFilteredEndpoints = endpoints.filter((endpoint: any) =>
+        filteredEndpoints = endpoints.filter((endpoint: any) =>
             Object.entries(filters).every(([filterKey, isEnabled]) =>
                 isEnabled || !FILTERS[filterKey].some((path: any) => endpoint.path.includes(path))
             )
-        );
-        filteredEndpoints = newFilteredEndpoints
+        )
     }
 
     if (searchQuery) {
@@ -165,7 +150,12 @@ const EndpointExplorer = () => {
         return (
             <Card className="container mx-auto my-2">
                 <CardHeader>
-                    <CardTitle>MOD API validator</CardTitle>
+                    <CardTitle>
+                        <PageTitle>
+                            MOD API validator
+                        </PageTitle>
+                    </CardTitle>
+
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex gap-4">
