@@ -1,7 +1,6 @@
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger
@@ -10,9 +9,9 @@ import {ScrollArea} from "@/components/ui/scroll-area";
 import JSONViewer from "@/components/JSONViewer";
 import React from "react";
 import {Card, CardContent, CardTitle} from "@/components/ui/card";
-import {Car, FileCodeIcon, VerifiedIcon} from "lucide-react";
+import {FileCodeIcon, VerifiedIcon} from "lucide-react";
 import {RequiredStatus} from "@/app/validator/components/ModAPIValidatorResults";
-import {EndpointValidationResult} from "@/lib/modapi-validator";
+import {EndpointValidationResult} from "@/lib/api-fetcher";
 
 export default function ApiTestResultDetail({path, result}: { path: string, result: EndpointValidationResult }) {
     const isFound = (prop: string, allProps: string[]) => {
@@ -82,7 +81,7 @@ export default function ApiTestResultDetail({path, result}: { path: string, resu
                         </CardTitle>
                         <CardContent className="flex-grow overflow-hidden p-0">
                             <ScrollArea className="h-full w-full p-1">
-                                <JSONViewer data={result.expectedModel.properties}/>
+                                <JSONViewer data={result.expectedModel?.properties}/>
                             </ScrollArea>
                         </CardContent>
                     </Card>

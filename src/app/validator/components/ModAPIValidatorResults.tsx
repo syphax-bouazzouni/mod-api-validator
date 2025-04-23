@@ -1,14 +1,13 @@
 import {ModAPI} from "@/lib/modapi-parser";
-import {Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Button} from "@/components/ui/button";
-import ApiTestResultDetail from "@/app/validator/components/ApiTestResutDetail";
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
-import {CircleCheck, CircleX, Info, Loader2} from "lucide-react";
+import {CircleCheck, CircleX, Loader2} from "lucide-react";
 import {Alert} from "@/components/ui/alert";
 import ModApiEndpointsChecks from "@/components/ModApiEndpointsCheck";
-import Link from "next/link";
-import {EndpointValidationResult, PropertiesResult, useModAPIValidator} from "@/lib/modapi-validator";
 import {useModEndpointsFilter} from "@/app/explore/components/openapi-explorer";
+import {EndpointValidationResult, PropertiesResult} from "@/lib/api-fetcher";
+import {useModAPIValidator} from "@/lib/validator/modapi-validator";
+import {ValidatorResultsTable} from "@/app/validator/components/ValitatorResultsTable";
+import {ResultExplicationTooltip} from "@/components/result-explication-tooltip";
+import JSONViewer from "@/components/JSONViewer";
 
 export function PropertiesStatus({checked, from, all}: { checked: boolean, from: number, all: number }) {
     if (all === 0 || all === undefined) {
@@ -60,129 +59,157 @@ export function Level({properties, level}: { properties?: PropertiesResult, leve
 }
 
 export function ShowPropertiesResult({endpoint}: { endpoint: EndpointValidationResult }) {
-    const allRequiredFound = endpoint.properties.foundRequiredProperties === endpoint.properties.requiredProperties && endpoint.properties.foundRequiredProperties > 0;
+    const allRequiredFound = endpoint.checks.requiredProperties
     const properties = endpoint.properties;
-    return (
-        <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger>
-                    {properties.requiredProperties > 0 ?
-                        <div className="flex items-center gap-2">
-                            <Checker check={allRequiredFound}/>
-                            <RequiredStatus properties={properties}/>
-                        </div> :
-                        <span className="text-gray-500">N/A</span>}
-                </TooltipTrigger>
+    const allRequiredProperties = properties.allRequiredProperties || [];
+    const trigger = () => {
+        return <div className="flex items-center gap-2">
+            {allRequiredProperties.length == 0 ? <span className="text-gray-500">N/A</span> :
+                <Checker check={allRequiredFound}/>}
+        </div>
+    }
 
-                <TooltipContent className="bg-white border shadow-lg rounded-lg p-4 max-w-[300px]">
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center gap-2">
-                            <span className="font-semibold text-gray-700">Required Properties</span>
-                            <RequiredStatus properties={properties}/>
-                        </div>
-                        <div className="flex justify-between items-center gap-2">
-                            <span className="text-gray-600">Total Properties (Level 4)</span>
-                            <FoundPropertiesStatus properties={properties}/>
-                        </div>
-                        {!allRequiredFound && (
-                            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-2 mt-2">
-                                <div className="flex items-center">
-                                    <Info className="text-yellow-600 mr-2" size={16}/>
-                                    <span className="text-yellow-800 text-sm">
-                    Some required properties are missing
-                  </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    );
+    return <ResultExplicationTooltip header={trigger()}>
+        <div className="flex flex-col gap-2">
+            <Level properties={properties}/>
+            <div className="flex justify-between items-center gap-2">
+                <span className="font-semibold text-gray-700">Required Properties</span>
+                <RequiredStatus properties={properties}/>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+                <span className="text-gray-600">Total Properties (Level 4)</span>
+                <FoundPropertiesStatus properties={properties}/>
+            </div>
+        </div>
+    </ResultExplicationTooltip>
 }
 
 export function ShowJsonLDCheck({endpoint}: { endpoint: EndpointValidationResult }) {
-    return <span title={'Require @id, @type, @context'}> <Checker check={endpoint.jsonLD}/> </span>
+    const jsonLD = endpoint.checks.jsonLD;
+    const isList = endpoint.expectedModel?.list;
+
+    const trigger = () => <Checker check={jsonLD}/>;
+
+    const displayItemJsonLD = (item: any) => {
+        if (!item) return <span className="text-gray-500">No item found</span>;
+
+        return (
+            <div className="flex flex-col gap-2 p-2 border rounded-md">
+                <span className="text-gray-500 font-medium">@id: <span
+                    className="text-black">{item['@id'] ?? "No @id found"}</span></span>
+                <span className="text-gray-500 font-medium">@type: <span
+                    className="text-black">{item['@type'] ?? "No @type found"}</span></span>
+                <span className="text-gray-500 font-medium">@context: {item['@context'] ?
+                    <JSONViewer data={item['@context']}/> : "No @context found"}</span>
+            </div>
+        );
+    };
+
+    return (
+        <ResultExplicationTooltip header={trigger()}>
+            <div className="flex flex-col gap-4 p-4">
+                <span className="text-gray-700 font-bold text-lg">JSON-LD Validation</span>
+                <span className={`text-sm ${jsonLD ? "text-green-600" : "text-red-600"}`}>
+                    {jsonLD ? "Valid JSON-LD" : "Invalid JSON-LD: Items must have @id, @type, and @context"}
+                </span>
+
+                {isList && (
+                    <div className="flex flex-col gap-2">
+                        <span className="text-gray-600 font-semibold">Collection Level</span>
+                        {displayItemJsonLD(endpoint.originalResponse)}
+                    </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                    <span className="text-gray-600 font-semibold">Item Level</span>
+                    {displayItemJsonLD(endpoint.testItem)}
+                </div>
+            </div>
+        </ResultExplicationTooltip>
+    );
 }
 
 export function ShowPaginationCheck({endpoint}: { endpoint: EndpointValidationResult }) {
-    return <span title={'Is paginated'}> <Checker check={endpoint.pagination}/> </span>
+    return <span title={'Is paginated'}> <Checker check={endpoint.checks.pagination}/> </span>
 }
 
 export function ShowExpectedType({endpoint}: { endpoint: EndpointValidationResult }) {
-    let foundType = endpoint.testItem && endpoint.testItem['@type'] || [];
-    let expectedType = endpoint.responseType.label ? endpoint.responseType.label.replace("mod", "").trim() : "";
+    let foundType = endpoint.foundType
+    let expectedType = endpoint.expectedType
 
-    if (!(foundType instanceof Array)) {
-        foundType = [foundType];
+    const trigger = () => {
+        if (expectedType === "") {
+            return <span className="text-gray-500">N/A</span>
+        }
+        return <div className="flex items-center gap-2">
+            <Checker check={endpoint.checks.goodType}/>
+        </div>
     }
+    return <ResultExplicationTooltip header={trigger()}>
+        <div className="flex  flex-col gap-2">
+            <div className="flex flex-col justify-between items-center gap-2">
+                <span className="font-semibold text-gray-700">Expected type</span>
+                <span className="text-gray-500">{expectedType ?? "Not provided in specification"} </span>
 
-    foundType = foundType.map((type: string) => {
-        type = type.toString().split("/").pop();
-        type = type.replace("mod#", "").trim();
-        return type;
-    })
-
-
-    let goodType = expectedType !== "" && foundType.includes(expectedType);
-
-    return <span title={expectedType ? 'Expected type ' + expectedType + ' found type: ' + foundType : 'The specification did not provide a type'}>
-    {expectedType !== "" ?
-        <div className={'flex items-center gap-2'}>
-            <Checker check={goodType}/>
-        </div> :
-        <span className={'text-gray-500'}>N/A</span>}
-    </span>
+            </div>
+            <div className="flex flex-col justify-between items-center gap-2">
+                <span className="text-gray-600 font-semibold">Found types</span>
+                <span className="text-gray-500">{foundType ?? "No type found"}</span>
+            </div>
+        </div>
+    </ResultExplicationTooltip>
 }
 
-export function ShowModAPIValidatorResults({baseUrl, results}: {
-    baseUrl: string,
-    results: Record<string, EndpointValidationResult>
-}) {
-    return <Table>
-        <TableCaption>Overview of API Endpoints and Their Properties</TableCaption>
-        <TableHeader>
-            <TableRow>
-                <TableHead>Endpoint</TableHead>
-                <TableHead>Exists (Level 1)</TableHead>
-                <TableHead>Good @type (Level 2)</TableHead>
-                <TableHead>Properties (Level 3-4)</TableHead>
-                <TableHead>Valid JSON-LD</TableHead>
-                <TableHead>Paginated</TableHead>
-                <TableHead>See JSON</TableHead>
-            </TableRow>
-        </TableHeader>
-        <TableBody>
-            {Object.entries(results).map(([path, endpoint], index) => (
-                <TableRow key={index}>
-                    <TableCell className="font-medium">
-                        <Button variant={'link'}><Link href={baseUrl + path} target={'_blank'}>{path}</Link></Button>
-                    </TableCell>
-                    <TableCell>
-                        <div className={'flex items-center gap-2'}
-                             title={`Status: ${endpoint.originalResponse.status}`}>
-                            <Checker check={endpoint.exists}/>
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <ShowExpectedType endpoint={endpoint}/>
-                    </TableCell>
-                    <TableCell>
-                        <ShowPropertiesResult endpoint={endpoint}/>
-                    </TableCell>
-                    <TableCell>
-                        <ShowJsonLDCheck endpoint={endpoint}/>
-                    </TableCell>
-                    <TableCell>
-                        {endpoint.expectedModel.list && <ShowPaginationCheck endpoint={endpoint}/>}
-                    </TableCell>
-                    <TableCell>
-                        <ApiTestResultDetail path={path} result={endpoint}/>
-                    </TableCell>
-                </TableRow>
-            ))}
-        </TableBody>
-    </Table>
+export function ShowScore({endpoint}: { endpoint: EndpointValidationResult }) {
+
+    const scores = endpoint.scores || {}
+
+    const trigger = () => {
+        return <span className="text-gray-500">{endpoint.score}</span>
+    }
+
+    return <ResultExplicationTooltip header={trigger()}>
+        <div className="flex flex-col gap-2">
+            <span className="text-gray-700 font-semibold">Score: {endpoint.score} / {endpoint.maxScore}</span>
+        </div>
+        {Object.keys(scores).map((key) => {
+            const score = scores[key]
+            return <div key={key}
+                        className={"flex justify-between items-center gap-2" + (score > 0 ? " text-green-600" : " text-red-500")}>
+                <span className="">{key}</span>
+                <span className="">{score}</span>
+            </div>
+        })}
+
+    </ResultExplicationTooltip>
+}
+
+export function ShowExists({ endpoint }: { endpoint: EndpointValidationResult }) {
+    const exist = endpoint.checks.exists;
+    const status = endpoint.status;
+
+    const trigger = () => (
+        <div className="flex items-center gap-2">
+            <Checker check={exist} />
+        </div>
+    );
+
+    return (
+        <ResultExplicationTooltip header={trigger()}>
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                    <span className="text-gray-700 font-bold">Status</span>
+                    <span className={`text-sm ${exist ? "text-green-600" : "text-red-600"}`}>
+                        {exist ? "Exists" : "Does not exist"}
+                    </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                    <span className="text-gray-700 font-bold">Status Code</span>
+                    <span className="text-black font-medium">{status}</span>
+                </div>
+            </div>
+        </ResultExplicationTooltip>
+    );
 }
 
 export function Loading() {
@@ -195,15 +222,14 @@ export function Loading() {
 }
 
 export function ModAPIValidatorResults({
-                                           model, baseUrl, apikey, params
+                                           model, baseUrl, params
                                        }: {
     model: ModAPI | undefined | null,
     baseUrl: string,
-    apikey: string | null
     params: string | null
 }) {
 
-    if (!baseUrl || !model || !model.endpoints) {
+    if (!baseUrl || !model?.endpoints) {
         return null;
     }
 
@@ -211,22 +237,29 @@ export function ModAPIValidatorResults({
         metadata: false,
         search: true,
         data: true,
-        labels: false,
-        records: false
+        labels: true,
+        records: true
     }
 
     const checkedFilters = {...enabledFilters, metadata: true}
 
     const {filters, setFilters, filteredEndpoints} = useModEndpointsFilter(model.endpoints, checkedFilters);
 
-    const {isError, results, errors, isLoading} = useModAPIValidator(filteredEndpoints, baseUrl, apikey, params);
+    const {isError, results, errors, isLoading} = useModAPIValidator(filteredEndpoints, baseUrl, params);
+
+    const totalScore = Object.values(results).map(x => x.score).reduce((a, b) => a + b, 0);
+    const maxScore = Object.values(results).map(x => x.maxScore).reduce((a, b) => a + b, 0);
 
     return <div className="space-y-4">
         {isLoading && <div><Loading/></div>}
         {isError && <Alert variant={'destructive'}>Error: {errors.map(x => x.message)}</Alert>}
         {results && Object.keys(results).length > 0 && <div>
             <ModApiEndpointsChecks filters={filters} setFilters={setFilters} enabledFilters={enabledFilters}/>
-            <ShowModAPIValidatorResults baseUrl={baseUrl} results={results}/>
+            <div className={'gap-2'}>
+                <div className={'text-gray-500'}>Total endpoints: {filteredEndpoints.length}</div>
+                <div className={'text-gray-500'}>Total score: {totalScore} / {maxScore} </div>
+            </div>
+            <ValidatorResultsTable results={results} baseUrl={baseUrl}/>
         </div>}
     </div>
 }
