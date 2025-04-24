@@ -1,5 +1,6 @@
 import {APITestResult, ParametersResult, PropertiesResult} from "@/lib/api-fetcher";
 import {ModAPIEndpoint} from "@/lib/modapi-parser";
+import {AppConfig} from "@/lib/config";
 export class ChecksHelpers {
     static checkRequiredProperties(properties: PropertiesResult): boolean {
         const foundRequiredProperties = properties.foundRequiredProperties;
@@ -46,9 +47,9 @@ export class ChecksHelpers {
     }
 
     static checkEndpointPagination(response: APITestResult<any> | undefined): boolean {
-        const keyToInclude = ['member', "@type", "totalItems", "view"];
+        const keyToInclude = AppConfig.paginationKeys
         const isList = response?.endpoint.responseType.model?.list
-        return !isList || keyToInclude.every(key => response?.originalResponse?.[key]);
+        return !isList || keyToInclude.every(key => Object.keys(response?.originalResponse).includes(key));
     }
 
     static checkJSONLD(response: any, item: any): boolean {

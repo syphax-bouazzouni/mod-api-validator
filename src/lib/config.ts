@@ -10,6 +10,7 @@ type Configuration = {
     participants: ParticipantAPI[];
     openapiUrl: string;
     scores: Record<string, number>;
+    paginationKeys: string[];
 }
 export const AppConfig: Configuration = {
     participants: [
@@ -42,4 +43,5 @@ export const AppConfig: Configuration = {
         jsonLD: 10,
         pagination: 5
     }
+    paginationKeys: ['member', "@type", "totalItems", "view"]
 }
