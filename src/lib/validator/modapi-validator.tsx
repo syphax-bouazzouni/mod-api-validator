@@ -30,7 +30,7 @@ export function useCollectionAPIValidator({
                 }
                 return APIUtils.fetchURL(endpoint.path, baseUrl, null, params)
             },
-            select: (data: any) => APIUtils.processAPIResponse(data, endpoint.path, endpoint)
+            select: (data: any) => APIUtils.processAPIResponse(data, endpoint.path, params, endpoint)
         }))
     });
 }
@@ -81,7 +81,7 @@ export function useSecondLevelAPIValidator({
             return {
                 queryKey: ['api-test-calls-second-level', resolvedPath, baseUrl],
                 queryFn: () => APIUtils.fetchURL(resolvedPath, baseUrl, null, params),
-                select: (data: any) => APIUtils.processAPIResponse(data, resolvedPath, endpoint)
+                select: (data: any) => APIUtils.processAPIResponse(data, resolvedPath, params, endpoint)
             };
         })
     });
@@ -187,7 +187,7 @@ export function useThirdLevelAPIValidator({
             return {
                 queryKey: ['api-test-calls-third-level', endpoint.path, baseUrl],
                 queryFn: () => APIUtils.fetchURL(resolvedPath, baseUrl, null, params),
-                select: (data: any) => APIUtils.processAPIResponse(data, resolvedPath, endpoint)
+                select: (data: any) => APIUtils.processAPIResponse(data, resolvedPath, params, endpoint)
             };
         })
     });

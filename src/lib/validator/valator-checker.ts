@@ -45,6 +45,7 @@ export function validateEndpoint(
         expectedModel: endpoint.responseType.model || {},
         testItem: itemToCheck,
         path: endpoint.path,
+        params: response?.params ?? "",
         status: response?.status ?? 0,
         scores: ScoreHelpers.getScores(checks),
         score: ScoreHelpers.calculateScore(checks),

@@ -56,7 +56,7 @@ function tableColumns(baseUrl: string): ColumnDef<EndpointValidationResult>[] {
             header: (col) => sortableColumn("Path", col.column),
             cell: ({row}) => (
                 <Button variant="link">
-                    <a href={baseUrl + row.original.path} target="_blank">
+                    <a href={baseUrl + row.original.path + "?" + row.original.params} target="_blank">
                         <p className="font-medium truncate max-w-[400px]">{row.original.path}</p>
                     </a>
                 </Button>

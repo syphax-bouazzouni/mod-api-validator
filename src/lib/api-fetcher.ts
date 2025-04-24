@@ -5,6 +5,7 @@ export interface APITestResult<T> {
     originalResponse: any;
     status: number;
     path: string;
+    params: string;
     endpoint: ModAPIEndpoint;
     error: any;
 }
@@ -45,6 +46,7 @@ export interface EndpointValidationResult {
     originalResponse: any;
     testItem: any;
     path: string;
+    params: string;
     status: number;
     scores: Record<string, number>;
     score: number;
@@ -72,7 +74,7 @@ export class APIUtils {
         return Array.isArray(data) ? data[0] : data;
     }
 
-    static processAPIResponse(data: any, path: string, endpoint: ModAPIEndpoint): APITestResult<any> {
+    static processAPIResponse(data: any, path: string, params: string, endpoint: ModAPIEndpoint): APITestResult<any> {
         const processedItem = this.extractFirstResult(data.data);
         return {
             item: processedItem || null,
@@ -80,6 +82,7 @@ export class APIUtils {
             originalResponse: data.data,
             error: data.error,
             path,
+            params,
             endpoint
         };
     }
