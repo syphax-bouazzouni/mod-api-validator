@@ -1,5 +1,5 @@
 import {ModAPI} from "@/lib/modapi-parser";
-import {CircleCheck, CircleX, Loader2} from "lucide-react";
+import {CheckCircleIcon, CircleCheck, CircleX, Loader2} from "lucide-react";
 import {Alert} from "@/components/ui/alert";
 import ModApiEndpointsChecks from "@/components/ModApiEndpointsCheck";
 import {useModEndpointsFilter} from "@/app/explore/components/openapi-explorer";
@@ -8,6 +8,7 @@ import {useModAPIValidator} from "@/lib/validator/modapi-validator";
 import {ValidatorResultsTable} from "@/app/validator/components/ValitatorResultsTable";
 import {ResultExplicationTooltip} from "@/components/result-explication-tooltip";
 import JSONViewer from "@/components/JSONViewer";
+import {AppConfig} from "@/lib/config";
 
 export function PropertiesStatus({checked, from, all}: { checked: boolean, from: number, all: number }) {
     if (all === 0 || all === undefined) {
@@ -130,7 +131,47 @@ export function ShowJsonLDCheck({endpoint}: { endpoint: EndpointValidationResult
 }
 
 export function ShowPaginationCheck({endpoint}: { endpoint: EndpointValidationResult }) {
-    return <span title={'Is paginated'}> <Checker check={endpoint.checks.pagination}/> </span>
+    const paginated = endpoint.checks.pagination;
+    const requiredKeys = AppConfig.paginationKeys;
+    const responseKeys = endpoint.originalResponse ? Object.keys(endpoint.originalResponse) : [];
+    const missingKeys = requiredKeys.filter((key: string) => !responseKeys.includes(key));
+
+    const trigger = () => <Checker check={paginated}/>;
+
+    return <ResultExplicationTooltip header={trigger()}>
+        <div className="flex flex-col gap-4 p-4">
+            <span className="text-gray-700 font-bold text-lg">Pagination Validation</span>
+
+            {paginated ? (
+                <div className="text-sm text-green-600 flex items-center">
+                    <CheckCircleIcon className="w-4 h-4 mr-2" />
+                    <span>Valid pagination structure</span>
+                </div>
+            ) : (
+                <div className="text-sm text-red-600">
+                    <span className="font-semibold">Invalid pagination:</span>
+                    <span> Must include required keys: </span>
+                    <span className="font-mono">{requiredKeys.join(', ')}</span>
+                </div>
+            )}
+
+            <div className="text-sm">
+                <span className="text-gray-600 font-semibold">Found keys: </span>
+                {responseKeys.length > 0 ? (
+                    <span className="font-mono text-gray-700">{responseKeys.join(', ')}</span>
+                ) : (
+                    <span className="italic text-gray-500">No keys found in response</span>
+                )}
+            </div>
+
+            {!paginated && missingKeys.length > 0 && (
+                <div className="text-sm">
+                    <span className="text-gray-600 font-semibold">Missing keys: </span>
+                    <span className="font-mono text-red-500">{missingKeys.join(', ')}</span>
+                </div>
+            )}
+        </div>
+    </ResultExplicationTooltip>
 }
 
 export function ShowExpectedType({endpoint}: { endpoint: EndpointValidationResult }) {
@@ -184,13 +225,13 @@ export function ShowScore({endpoint}: { endpoint: EndpointValidationResult }) {
     </ResultExplicationTooltip>
 }
 
-export function ShowExists({ endpoint }: { endpoint: EndpointValidationResult }) {
+export function ShowExists({endpoint}: { endpoint: EndpointValidationResult }) {
     const exist = endpoint.checks.exists;
     const status = endpoint.status;
 
     const trigger = () => (
         <div className="flex items-center gap-2">
-            <Checker check={exist} />
+            <Checker check={exist}/>
         </div>
     );
 
