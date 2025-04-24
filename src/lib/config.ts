@@ -38,11 +38,11 @@ export const AppConfig: Configuration = {
         }],
     openapiUrl: 'https://raw.githubusercontent.com/syphax-bouazzouni/MOD-API/main/mod_api/static/mod_api/openapi.yaml',
     scores: {
-        exists: 20,
+        exists: 5,
         requiredProperties: 30,
         goodType: 15,
-        jsonLD: 10,
+        jsonLD: 20,
         pagination: 5
-    }
+    },
     paginationKeys: ['member', "@type", "totalItems", "view"]
 }
