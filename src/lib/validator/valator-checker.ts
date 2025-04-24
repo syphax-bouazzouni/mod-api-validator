@@ -10,7 +10,7 @@ export function validateEndpoint(
 ): EndpointValidationResult {
     const itemToCheck = response?.item;
     const properties = ChecksHelpers.checkEndpointProperties(endpoint, itemToCheck);
-    const expectedType = endpoint.responseType.type ? endpoint.responseType.type.replace("mod:", "").trim() : "";
+    const expectedType = endpoint.responseType.type?.includes("mod") ? endpoint.responseType.type.replace("mod:", "").trim() : "";
     let foundType = itemToCheck?.['@type'] || null;
 
     if (!(foundType instanceof Array) && foundType) {
@@ -18,7 +18,7 @@ export function validateEndpoint(
     }
 
     foundType = foundType?.map((type: string) => {
-        type = type.toString().split("/").pop() || type;
+        type = type.toString().split("/").pop() ?? type;
         type = type.replace("mod#", "").trim();
         type = type.replace("mod:", "").trim();
         return type;
@@ -41,7 +41,7 @@ export function validateEndpoint(
         originalResponse: response?.originalResponse || {},
         responseType: endpoint.responseType || {},
         foundType: foundType?.join(", ") || null,
-        expectedType: endpoint.responseType.type ? endpoint.responseType.type.replace("mod:", "").trim() : "",
+        expectedType: expectedType,
         expectedModel: endpoint.responseType.model || {},
         testItem: itemToCheck,
         path: endpoint.path,
