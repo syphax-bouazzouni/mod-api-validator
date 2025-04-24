@@ -14,6 +14,7 @@ type Configuration = {
 }
 export const AppConfig: Configuration = {
     participants: [
+        {id: 'finto', name: 'Finto (SKOSMOS)', baseURL: 'https://mod-api.dev.finto.fi' },
         {
             id: 'stageportal',
             name: 'OntoPortal staging',
